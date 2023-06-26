@@ -16,114 +16,70 @@ declare -A DEV_LIST=(["cc_aligned"]="flores" ["PrimeMinisterCorpus"]="PrimeMinis
 preprocess () {
     perl -E "print '=' x 80 "
     printf "\n"
-    echo "******************** Start PREPROCESSING for ${lang_pair_list} ********************\n"
+    echo "******************** Start PREPROCESSING for ${s2lang_pair} ********************\n"
 
-    count=0
-    while [ $count -ne $(($language_num)) ]
+    path_to_data2="../Datasets/${s2lang}/train/${domain2}/${size2}"
+
+    # mkdir -p ${save_path}/encode/${domain1}
+    mkdir -p ${save_path}/encode/${domain2}
+    # mkdir -p ${save_path}/preprocess/${domain1}
+    mkdir -p ${save_path}/preprocess/${domain2}
+
+    DICT_s="${PRETRAINED_PATH}/dict.${s2lang_tag_from}.txt" 
+    DICT_t="${PRETRAINED_PATH}/dict.${s2lang_tag_to}.txt"
+
+    # STAGE 2 Encoding
+    # train
+    echo "******************** Start encoding for STAGE 2 train set ********************\n"
+    python fairseq/scripts/spm_encode.py \
+        --model ${PRETRAINED_PATH}/sentence.bpe.model \
+        --inputs ${path_to_data2}/train-${s2lang_tag_from}.txt ${path_to_data2}/train-${s2lang_tag_to}.txt  \
+        --outputs ${save_path}/encode/${domain2}/train.spm.${s2lang_tag_from} ${save_path}/encode/${domain2}/train.spm.${s2lang_tag_to}
+    echo "******************** Finished encoding for STAGE 2 train set ********************\n"
+
+    # dev
+    echo "******************** Start encoding for STAGE 2 dev set ********************\n"
+    python fairseq/scripts/spm_encode.py \
+        --model ${PRETRAINED_PATH}/sentence.bpe.model \
+        --inputs ../Datasets/${lang}/dev/${DEV_LIST[${domain2}]}/dev-${s2lang_tag_from}.txt ../Datasets/${lang}/dev/${DEV_LIST[${domain2}]}/dev-${s2lang_tag_to}.txt  \
+        --outputs  ${save_path}/encode/${domain2}/dev.spm.${s2lang_tag_from} ${save_path}/encode/${domain2}/dev.spm.${s2lang_tag_to}
+    echo "******************** Finished encoding for STAGE 2 dev set ********************\n"
+
+    fairseq-preprocess \
+    --source-lang ${s2lang_tag_from} \
+    --target-lang ${s2lang_tag_to} \
+    --trainpref ${save_path}/encode/${domain2}/train.spm \
+    --validpref ${save_path}/encode/${domain2}/dev.spm \
+    --destdir ${save_path}/preprocess/${domain2} \
+    --thresholdtgt 0 \
+    --thresholdsrc 0 \
+    --srcdict $DICT_s \
+    --tgtdict $DICT_t \
+    --workers 70 \
+    --seed 222
+
+    for test_set in "${domains[@]}"
     do
-        lang_tag_from=${lang_tag_from_array[$count]}
-        lang=${lang_array[$count]}
-        lang_tag_to=${lang_tag_to_array[$count]}
-        echo $lang_tag_from
-        echo $lang
-        echo $lang_tag_to
-        echo "******************** Start PREPROCESSING for ${lang_pairs[$count]} ********************\n"
-        # train data paths
-        # path_to_data1="../Datasets/${lang}/train/${domain1}/${size1}"
-        path_to_data2="../Datasets/${lang}/train/${domain2}/${size2}"
+        mkdir -p ${save_path}/test/encode/${test_set}
+        mkdir -p ${save_path}/test/preprocess/${test_set}
+        mkdir -p ${save_path}/test/hypothesis/${domain1}/${test_set}
+        mkdir -p ${save_path}/test/hypothesis/${domain2}/${test_set}
 
-        # mkdir -p ${save_path}/encode/${domain1}
-        mkdir -p ${save_path}/encode/${domain2}
-        # mkdir -p ${save_path}/preprocess/${domain1}
-        mkdir -p ${save_path}/preprocess/${domain2}
-
-        DICT_s="${PRETRAINED_PATH}/dict.${lang_tag_from}.txt" 
-        DICT_t="${PRETRAINED_PATH}/dict.${lang_tag_to}.txt"
-
-        # # STAGE 1 Encoding
-        # # train
-        # echo "******************** Start encoding for STAGE 1 train set ********************\n"
-        # python fairseq/scripts/spm_encode.py \
-        #     --model ${PRETRAINED_PATH}/sentence.bpe.model \
-        #     --inputs ${path_to_data1}/train-${lang_tag_from}.txt ${path_to_data1}/train-${lang_tag_to}.txt  \
-        #     --outputs ${save_path}/encode/${domain1}/train.spm.${lang_tag_from} ${save_path}/encode/${domain1}/train.spm.${lang_tag_to}
-        # echo "******************** Finished encoding for STAGE 1 train set ********************\n"
-
-        # # dev
-        # echo "******************** Start encoding for STAGE 1 dev set ********************\n"
-        # python fairseq/scripts/spm_encode.py \
-        #     --model ${PRETRAINED_PATH}/sentence.bpe.model \
-        #     --inputs ../Datasets/${lang}/dev/${DEV_LIST[${domain1}]}/dev-${lang_tag_from}.txt ../Datasets/${lang}/dev/${DEV_LIST[${domain1}]}/dev-${lang_tag_to}.txt  \
-        #     --outputs  ${save_path}/encode/${domain1}/dev.spm.${lang_tag_from} ${save_path}/encode/${domain1}/dev.spm.${lang_tag_to}
-        # echo "******************** Finished encoding for STAGE 1 dev set ********************\n"
-
-        # fairseq-preprocess \
-        # --source-lang ${lang_tag_from} \
-        # --target-lang ${lang_tag_to} \
-        # --trainpref ${save_path}/encode/${domain1}/train.spm \
-        # --validpref ${save_path}/encode/${domain1}/dev.spm \
-        # --destdir ${save_path}/preprocess/${domain1} \
-        # --thresholdtgt 0 \
-        # --thresholdsrc 0 \
-        # --srcdict $DICT_s \
-        # --tgtdict $DICT_t \
-        # --workers 70 \
-        # --seed 222
-
-        # domains=("${PMO_LIST[${lang}]}" "${BIBLE_LIST[${lang}]}" "flores")
-        # echo "Test domains: ${domains}"
-        # for test_set in "${domains[@]}"
-        # do
-        #     mkdir -p ${save_path}/test/encode/${test_set}
-        #     mkdir -p ${save_path}/test/preprocess/${test_set}
-        #     mkdir -p ${save_path}/test/hypothesis/${domain1}/${test_set}
-        #     mkdir -p ${save_path}/test/hypothesis/${domain2}/${test_set}
-
-        #     echo "******************** Start encoding for test set: ${test_set} ********************\n"
-        #     python fairseq/scripts/spm_encode.py \
-        #         --model ${PRETRAINED_PATH}/sentence.bpe.model \
-        #         --inputs ../Datasets/${lang}/test/${test_set}/test-${lang_tag_from}.txt ../Datasets/${lang}/test/${test_set}/test-${lang_tag_to}.txt  \
-        #         --outputs ${save_path}/test/encode/${test_set}/test.spm.${lang_tag_from} ${save_path}/test/encode/${test_set}/test.spm.${lang_tag_to}
-        #     echo "******************** Finished encoding for test set: ${test_set} ********************\n"
-
-        #     DICT_s="${PRETRAINED_PATH}/dict.${lang_tag_from}.txt"
-        #     DICT_t="${PRETRAINED_PATH}/dict.${lang_tag_to}.txt"
-
-        #     fairseq-preprocess \
-        #     --source-lang ${lang_tag_from} \
-        #     --target-lang ${lang_tag_to} \
-        #     --testpref ${save_path}/test/encode/${test_set}/test.spm \
-        #     --destdir ${save_path}/test/preprocess/${test_set} \
-        #     --thresholdtgt 0 \
-        #     --thresholdsrc 0 \
-        #     --srcdict $DICT_s \
-        #     --tgtdict $DICT_t \
-        #     --workers 70 \
-        #     --seed 222
-        # done
-        # STAGE 2 Encoding
-        # train
-        echo "******************** Start encoding for STAGE 2 train set ********************\n"
+        echo "******************** Start encoding for test set: ${test_set} ********************\n"
         python fairseq/scripts/spm_encode.py \
             --model ${PRETRAINED_PATH}/sentence.bpe.model \
-            --inputs ${path_to_data2}/train-${lang_tag_from}.txt ${path_to_data2}/train-${lang_tag_to}.txt  \
-            --outputs ${save_path}/encode/${domain2}/train.spm.${lang_tag_from} ${save_path}/encode/${domain2}/train.spm.${lang_tag_to}
-        echo "******************** Finished encoding for STAGE 2 train set ********************\n"
+            --inputs ../Datasets/${lang}/test/${test_set}/test-${s2lang_tag_from}.txt ../Datasets/${lang}/test/${test_set}/test-${s2lang_tag_to}.txt  \
+            --outputs ${save_path}/test/encode/${test_set}/test.spm.${s2lang_tag_from} ${save_path}/test/encode/${test_set}/test.spm.${s2lang_tag_to}
+        echo "******************** Finished encoding for test set: ${test_set} ********************\n"
 
-        # dev
-        echo "******************** Start encoding for STAGE 2 dev set ********************\n"
-        python fairseq/scripts/spm_encode.py \
-            --model ${PRETRAINED_PATH}/sentence.bpe.model \
-            --inputs ../Datasets/${lang}/dev/${DEV_LIST[${domain2}]}/dev-${lang_tag_from}.txt ../Datasets/${lang}/dev/${DEV_LIST[${domain2}]}/dev-${lang_tag_to}.txt  \
-            --outputs  ${save_path}/encode/${domain2}/dev.spm.${lang_tag_from} ${save_path}/encode/${domain2}/dev.spm.${lang_tag_to}
-        echo "******************** Finished encoding for STAGE 2 dev set ********************\n"
+        DICT_s="${PRETRAINED_PATH}/dict.${s2lang_tag_from}.txt"
+        DICT_t="${PRETRAINED_PATH}/dict.${s2lang_tag_to}.txt"
 
         fairseq-preprocess \
-        --source-lang ${lang_tag_from} \
-        --target-lang ${lang_tag_to} \
-        --trainpref ${save_path}/encode/${domain2}/train.spm \
-        --validpref ${save_path}/encode/${domain2}/dev.spm \
-        --destdir ${save_path}/preprocess/${domain2} \
+        --source-lang ${s2lang_tag_from} \
+        --target-lang ${s2lang_tag_to}\
+        --testpref ${save_path}/test/encode/${test_set}/test.spm \
+        --destdir ${save_path}/test/preprocess/${test_set} \
         --thresholdtgt 0 \
         --thresholdsrc 0 \
         --srcdict $DICT_s \
@@ -131,41 +87,9 @@ preprocess () {
         --workers 70 \
         --seed 222
 
-        domains=("${PMO_LIST[${lang}]}" "${BIBLE_LIST[${lang}]}" "flores")
-        echo "Test domains: ${domains}"
-        for test_set in "${domains[@]}"
-        do
-            mkdir -p ${save_path}/test/encode/${test_set}
-            mkdir -p ${save_path}/test/preprocess/${test_set}
-            mkdir -p ${save_path}/test/hypothesis/${domain1}/${test_set}
-            mkdir -p ${save_path}/test/hypothesis/${domain2}/${test_set}
-
-            echo "******************** Start encoding for test set: ${test_set} ********************\n"
-            python fairseq/scripts/spm_encode.py \
-                --model ${PRETRAINED_PATH}/sentence.bpe.model \
-                --inputs ../Datasets/${lang}/test/${test_set}/test-${lang_tag_from}.txt ../Datasets/${lang}/test/${test_set}/test-${lang_tag_to}.txt  \
-                --outputs ${save_path}/test/encode/${test_set}/test.spm.${lang_tag_from} ${save_path}/test/encode/${test_set}/test.spm.${lang_tag_to}
-            echo "******************** Finished encoding for test set: ${test_set} ********************\n"
-
-            DICT_s="${PRETRAINED_PATH}/dict.${lang_tag_from}.txt"
-            DICT_t="${PRETRAINED_PATH}/dict.${lang_tag_to}.txt"
-
-            fairseq-preprocess \
-            --source-lang ${lang_tag_from} \
-            --target-lang ${lang_tag_to}\
-            --testpref ${save_path}/test/encode/${test_set}/test.spm \
-            --destdir ${save_path}/test/preprocess/${test_set} \
-            --thresholdtgt 0 \
-            --thresholdsrc 0 \
-            --srcdict $DICT_s \
-            --tgtdict $DICT_t \
-            --workers 70 \
-            --seed 222
-        done
-        count=$(($count+1))
     done
 
-    echo "******************** Finished PREPROCESSING for ${lang_pair_list} ********************\n"
+    echo "******************** Finished PREPROCESSING for ${s2lang_pair} ********************\n"
 }
 
 train () {
@@ -190,7 +114,7 @@ train () {
     --encoder-langtok "src" \
     --decoder-langtok \
     --lang-dict "$lang_list" \
-    --lang-pairs "$lang_pair_list" \
+    --lang-pairs "$s2lang_pair" \
     --criterion label_smoothed_cross_entropy --label-smoothing 0.2 \
     --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
     --lr-scheduler inverse_sqrt --lr 3e-05 --warmup-updates 2500 --max-update 40000 \
@@ -209,48 +133,36 @@ generate () {
     model_path=$2
 
     path_2_model="./${model_path}/checkpoints/checkpoint_best.pt"    
-    count=0
-    while [ $count -ne $(($language_num)) ]
+    for test_set in "${domains[@]}"
     do
-        lang_tag_from=${lang_tag_from_array[$count]}
-        lang=${lang_array[$count]}
-        lang_tag_to=${lang_tag_to_array[$count]}
-        lang_pair=${lang_pairs[$count]}
-        echo $lang_tag_from
-        echo $lang
-        echo $lang_tag_to
-        echo $lang_pair
-        domains=("${PMO_LIST[${lang}]}" "${BIBLE_LIST[${lang}]}" "flores")
-        echo "Test domains: ${domains}"
-        for test_set in "${domains[@]}"
-        do
-            path_2_data="./${save_path}/test/preprocess/${test_set}"
-            save_dir_path="./${save_path}/test/hypothesis/${domain}/${test_set}"
+        path_2_data="./${save_path}/test/preprocess/${test_set}"
+        save_dir_path="./${save_path}/test/hypothesis/${domain}/${test_set}"
 
-            # Create directory to save predictions
-            save_test_path="${save_dir_path}/${lang_tag_from}_${lang_tag_to}_checkpoint_best.pt"
-            echo "==============================================================================="
-            echo "Testing: ${model_path}, src: ${lang_tag_from}, tgt: ${lang_tag_to}, domain: ${test_set}"
-            echo "data: ${path_2_data}"
-            echo "model: checkpoint_best.pt"
-            fairseq-generate $path_2_data \
-                    --path $path_2_model \
-                    --task translation_multi_simple_epoch \
-                    --gen-subset test \
-                    --source-lang $lang_tag_from \
-                    --target-lang $lang_tag_to \
-                    --sacrebleu --remove-bpe 'sentencepiece' \
-                    --batch-size 32 \
-                    --encoder-langtok "src" \
-                    --decoder-langtok \
-                    --lang-dict $lang_list \
-                    --lang-pairs $lang_pair > "${save_test_path}.txt"
+        # Create directory to save predictions
+        # save_test_path="${save_dir_path}/${lang_tag_from}_${lang_tag_to}_checkpoint_last.pt"
+        save_test_path="${save_dir_path}/${lang_tag_from}_${lang_tag_to}_checkpoint_best.pt"
 
-            cat "${save_test_path}.txt" | grep -P "^H" |sort -V |cut -f 3-  > "${save_test_path}.hyp"
-            sacrebleu -tok spm -s none "../Datasets/${lang}/test/${test_set}/test-${lang_tag_to}.txt" < "${save_test_path}.hyp" -m chrf bleu > "${save_dir_path}/scores_${lang_pair}.json" 
-            
-        done
-        count=$(($count+1))
+        echo "==============================================================================="
+        echo "Testing: ${model_path}, src: ${s2lang_tag_from}, tgt: ${s2lang_tag_to}, domain: ${test_set}"
+        echo "data: ${path_2_data}"
+        # echo "model: checkpoint_last.pt"
+        echo "model: checkpoint_best.pt"
+        fairseq-generate $path_2_data \
+                --path $path_2_model \
+                --task translation_multi_simple_epoch \
+                --gen-subset test \
+                --source-lang $s2lang_tag_from \
+                --target-lang $s2lang_tag_to \
+                --sacrebleu --remove-bpe 'sentencepiece' \
+                --batch-size 32 \
+                --encoder-langtok "src" \
+                --decoder-langtok \
+		--criterion label_smoothed_cross_entropy \
+                --lang-dict $lang_list \
+                --lang-pairs $s2lang_pair > "${save_test_path}.txt"
+
+        cat "${save_test_path}.txt" | grep -P "^H" |sort -V |cut -f 3-  > "${save_test_path}.hyp"
+        sacrebleu -tok spm -s none "../Datasets/${s2lang}/test/${test_set}/test-${s2lang_tag_to}.txt" < "${save_test_path}.hyp" -m chrf bleu > "${save_dir_path}/scores.json" 
     done
 }
 
@@ -267,8 +179,19 @@ main () {
     echo "Stage 2 Domain: ${domain2}"
     echo "Stage 2 size: ${size2}"
 
+    if [ "${reverse}" -eq "0" ]
+    then
+        s2lang_tag_from="en_XX"
+        s2lang_tag_to=${LANG_TAG[${s2lang}]}
+    else
+        s2lang_tag_from=${LANG_TAG[${s2lang}]}
+        s2lang_tag_to="en_XX"
+    fi 
+   
+    s2lang_pair="${s2lang_tag_from}-${s2lang_tag_to}"
+
     stage1_save_path="multi-mixed-stage1-${domain1}-${size1}${save_path_postfix}"
-    save_path="multi-mixed-stage1-${domain1}-${size1}_stage2-${domain2}-${size2}${save_path_postfix}"
+    save_path="multi-mixed-stage1-${domain1}-${size1}${save_path_postfix}_stage2-${domain2}-${s2lang_pair}"
     echo "Save path: ${save_path}"
     mkdir -p ${save_path}
     mkdir -p ${save_path}/test
@@ -293,14 +216,14 @@ main () {
     # STAGE 2 Training
     perl -E "print '=' x 80 "
     printf "\n"
-    echo "******************** Start STAGE 2 Training ${lang_pair_list} using ${domain2}-${size2} ********************\n"
+    echo "******************** Start STAGE 2 Training ${s2lang_pair} using ${domain2}-${size2} ********************\n"
     train $domain2 "./${stage1_save_path}/stage1_${domain1}_model/checkpoints/checkpoint_best.pt" "./${save_path}/stage2_${domain1}-${domain2}_model"
-    echo "******************** Finished STAGE 2 Training ${lang_pair_list} using ${domain2}-${size2} ********************\n"
+    echo "******************** Finished STAGE 2 Training ${s2lang_pair} using ${domain2}-${size2} ********************\n"
 
     # STAGE 2 Testing
-    echo "******************** Start STAGE 2 Generation ${lang_pair_list} ********************\n"
+    echo "******************** Start STAGE 2 Generation ${s2lang_pair} ********************\n"
     generate $domain2 "./${save_path}/stage2_${domain1}-${domain2}_model"
-    echo "******************** Finished STAGE 2 Generation ${lang_pair_list} ********************\n"
+    echo "******************** Finished STAGE 2 Generation ${s2lang_pair} ********************\n"
 }
 
 language_num=$1
